@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// enum
+enum Role {
+  customer
+  admin
+}
+
+enum SeatClass {
+  first_class       
+  business
+  premium_economy   
+}
+
+enum BookingStatus {
+  pending
+  paid
+  cancelled
+}
+
+enum TicketStatus {
+  issued
+  used
+  expired
+}
+
+enum PaymentMethod {
+  bank_transfer
+  ewallet
+  qris            
+  credit_card
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+  expired          
+}
+
+// model (table)
+
+model User {
+  user_id    Int       @id @default(autoincrement())
+  full_name  String    @db.VarChar(100)
+  email      String    @unique @db.VarChar(100)
+  phone      String    @unique @db.VarChar(20)
+  password   String    @db.VarChar(255) // Menyimpan password_hash
+  role       Role      @default(customer)
+  created_at DateTime  @default(now())
+  bookings   Booking[]
+
+  @@map("users")
+}
+
+model Station {
+  station_id         Int        @id @default(autoincrement())
+  station_name       String     @db.VarChar(100)
+  city               String?    @db.VarChar(100)
+  code               String     @unique @db.VarChar(10) // Dibuat wajib (wajib punya kode stasiun)
+  departureSchedules Schedule[] @relation("DepartureStation")
+  arrivalSchedules   Schedule[] @relation("ArrivalStation")
+
+  @@map("stations")
+}
+
+model Train {
+  train_id    Int        @id @default(autoincrement())
+  train_name  String     @db.VarChar(100)
+  train_code  String     @unique @db.VarChar(20)
+  total_seats Int        @default(600)
+  schedules   Schedule[]
+  seats       Seat[]
+
+  @@map("trains")
+}
+
+model Schedule {
+  schedule_id       Int       @id @default(autoincrement())
+  train_id          Int
+  departure_station Int
+  arrival_station   Int
+  departure_time    DateTime
+  arrival_time      DateTime
+  price             Decimal   @db.Decimal(12, 2) // Harga dasar / start price
+  
+  train             Train     @relation(fields: [train_id], references: [train_id])
+  departureStation  Station   @relation("DepartureStation", fields: [departure_station], references: [station_id])
+  arrivalStation    Station   @relation("ArrivalStation", fields: [arrival_station], references: [station_id])
+  bookings          Booking[]
+
+  @@map("schedules")
+}
+
+model Seat {
+  seat_id           Int                @id @default(autoincrement())
+  train_id          Int
+  coach_number      String             @db.VarChar(10) // Tambahan: Menyimpan nomor gerbong (e.g., "Coach 03")
+  seat_number       String             @db.VarChar(10) // Angka dan Huruf kursi (e.g., "04A")
+  class             SeatClass          @default(premium_economy)
+  
+  train             Train              @relation(fields: [train_id], references: [train_id])
+  bookingPassengers BookingPassenger[]
+
+  @@map("seats")
+}
+
+model Booking {
+  booking_id        Int                @id @default(autoincrement())
+  user_id           Int
+  schedule_id       Int
+  booking_code      String             @unique @db.VarChar(20)
+  booking_date      DateTime           @default(now())
+  total_price       Decimal            @db.Decimal(12, 2)
+  status            BookingStatus      @default(pending)
+  
+  expired_at        DateTime           // Batas waktu checkout/pembayaran (misal: booking_date + 15 menit)
+  
+  user              User               @relation(fields: [user_id], references: [user_id])
+  schedule          Schedule           @relation(fields: [schedule_id], references: [schedule_id])
+  bookingPassengers BookingPassenger[]
+  payments          Payment[]
+  tickets           Ticket[]
+
+  @@map("bookings")
+}
+
+model BookingPassenger {
+  passenger_id Int     @id @default(autoincrement())
+  booking_id   Int
+  full_name    String  @db.VarChar(100)
+  id_number    String  @db.VarChar(30) // Nomor KTP / Paspor
+  seat_id      Int
+  
+  booking      Booking @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  seat         Seat    @relation(fields: [seat_id], references: [seat_id])
+
+  @@map("booking_passengers")
+}
+
+model Payment {
+  payment_id     Int           @id @default(autoincrement())
+  booking_id     Int
+  payment_method PaymentMethod
+  payment_date   DateTime?     // Dibuat nullable karena bisa saja pending dan belum bayar
+  amount         Decimal       @db.Decimal(12, 2)
+  payment_status PaymentStatus @default(pending)
+  
+  // Field opsional integrasi Payment Gateway (Midtrans/Xendit) jika dibutuhkan nanti
+  snap_token     String?       @db.VarChar(255) 
+  
+  booking        Booking       @relation(fields: [booking_id], references: [booking_id])
+
+  @@map("payments")
+}
+
+model Ticket {
+  ticket_id  Int          @id @default(autoincrement())
+  booking_id Int
+  qr_code    String       @unique @db.VarChar(255) //untuk scan gate
+  status     TicketStatus @default(issued)         // untuk  tiket (issued, used, expired)
+  issued_at  DateTime     @default(now())
+  
+  booking    Booking      @relation(fields: [booking_id], references: [booking_id])
+
+  @@map("tickets")
+}
