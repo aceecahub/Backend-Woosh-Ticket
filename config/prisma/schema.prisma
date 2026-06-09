@@ -55,7 +55,7 @@ model User {
   full_name  String    @db.VarChar(100)
   email      String    @unique @db.VarChar(100)
   phone      String    @unique @db.VarChar(20)
-  password   String    @db.VarChar(255) // Menyimpan password_hash
+  password   String    @db.VarChar(255)
   role       Role      @default(customer)
   created_at DateTime  @default(now())
   bookings   Booking[]
@@ -85,6 +85,19 @@ model Train {
   @@map("trains")
 }
 
+model Seat {
+  seat_id           Int                @id @default(autoincrement())
+  train_id          Int
+  coach_number      String             @db.VarChar(10) // Tambahan: Menyimpan nomor gerbong (e.g., "Coach 03")
+  seat_number       String             @db.VarChar(10) // Angka dan Huruf kursi (e.g., "04A")
+  class             SeatClass          @default(premium_economy)
+  
+  train             Train              @relation(fields: [train_id], references: [train_id])
+  bookingPassengers BookingPassenger[]
+
+  @@map("seats")
+}
+
 model Schedule {
   schedule_id       Int       @id @default(autoincrement())
   train_id          Int
@@ -100,19 +113,6 @@ model Schedule {
   bookings          Booking[]
 
   @@map("schedules")
-}
-
-model Seat {
-  seat_id           Int                @id @default(autoincrement())
-  train_id          Int
-  coach_number      String             @db.VarChar(10) // Tambahan: Menyimpan nomor gerbong (e.g., "Coach 03")
-  seat_number       String             @db.VarChar(10) // Angka dan Huruf kursi (e.g., "04A")
-  class             SeatClass          @default(premium_economy)
-  
-  train             Train              @relation(fields: [train_id], references: [train_id])
-  bookingPassengers BookingPassenger[]
-
-  @@map("seats")
 }
 
 model Booking {
