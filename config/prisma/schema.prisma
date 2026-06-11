@@ -26,6 +26,7 @@ enum BookingStatus {
   pending
   paid
   cancelled
+  completed
 }
 
 enum TicketStatus {

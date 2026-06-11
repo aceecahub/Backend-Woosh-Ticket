@@ -1,0 +1,589 @@
+{
+  "info": {
+    "name": "WOOSH Ticket API",
+    "description": "Koleksi API lengkap untuk testing seluruh modul aplikasi pemesanan tiket kereta Woosh.\n\nAlur testing:\n1. Register & Login (dapatkan token)\n2. Setup data master (Station, Train, Seat)\n3. Buat Schedule\n4. Search Schedule\n5. Cek Available Seats\n6. Create Booking\n7. Create Payment\n8. Payment Callback (simulasi gateway)\n9. Generate Ticket\n10. Scan Ticket (Check-in)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"full_name\": \"Budi Santoso\",\n    \"email\": \"budi@example.com\",\n    \"phone\": \"081234567890\",\n    \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"full_name\": \"Admin Woosh\",\n    \"email\": \"admin@woosh.com\",\n    \"phone\": \"081999999999\",\n    \"password\": \"admin123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "    console.log('Token tersimpan:', jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"budi@example.com\",\n    \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Stations",
+      "item": [
+        {
+          "name": "Get All Stations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/stations"
+          }
+        },
+        {
+          "name": "Get Station by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/stations/1"
+          }
+        },
+        {
+          "name": "Create Station - Halim",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/stations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"station_name\": \"Halim\",\n    \"city\": \"Jakarta Timur\",\n    \"code\": \"HLM\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Station - Karawang",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/stations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"station_name\": \"Karawang\",\n    \"city\": \"Karawang\",\n    \"code\": \"KRW\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Station - Padalarang",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/stations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"station_name\": \"Padalarang\",\n    \"city\": \"Bandung Barat\",\n    \"code\": \"PDL\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Station - Tegalluar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/stations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"station_name\": \"Tegalluar\",\n    \"city\": \"Bandung\",\n    \"code\": \"TGL\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Update Station",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{base_url}}/stations/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"station_name\": \"Stasiun Halim Baru\",\n    \"city\": \"Jakarta Timur\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Delete Station",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/stations/4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Trains",
+      "item": [
+        {
+          "name": "Get All Trains",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/trains"
+          }
+        },
+        {
+          "name": "Get Train by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/trains/1"
+          }
+        },
+        {
+          "name": "Create Train - Woosh Express",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/trains",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_name\": \"Woosh Express\",\n    \"train_code\": \"WSH-001\",\n    \"total_seats\": 600\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Train - Woosh Premium",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/trains",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_name\": \"Woosh Premium\",\n    \"train_code\": \"WSH-002\",\n    \"total_seats\": 400\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Update Train",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{base_url}}/trains/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"total_seats\": 500\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Delete Train",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/trains/2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Seats",
+      "item": [
+        {
+          "name": "Get All Seats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/seats"
+          }
+        },
+        {
+          "name": "Get Seat by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/seats/1"
+          }
+        },
+        {
+          "name": "Create Seat - Coach 01 A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/seats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_id\": 1,\n    \"coach_number\": \"Coach 01\",\n    \"seat_number\": \"01A\",\n    \"class\": \"business\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Seat - Coach 01 B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/seats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_id\": 1,\n    \"coach_number\": \"Coach 01\",\n    \"seat_number\": \"02A\",\n    \"class\": \"business\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Seat - Coach 02 Economy",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/seats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_id\": 1,\n    \"coach_number\": \"Coach 02\",\n    \"seat_number\": \"05B\",\n    \"class\": \"premium_economy\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Update Seat",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{base_url}}/seats/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"class\": \"first_class\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Delete Seat",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/seats/3"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Schedules",
+      "item": [
+        {
+          "name": "Get All Schedules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/schedules"
+          }
+        },
+        {
+          "name": "Get Schedule by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/schedules/1"
+          }
+        },
+        {
+          "name": "Search Schedules",
+          "description": "Cari jadwal berdasarkan stasiun asal, tujuan, tanggal, dan jumlah penumpang",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schedules/search?departure_station=1&arrival_station=2&date=2026-07-01&passengers=2",
+              "host": ["{{base_url}}"],
+              "path": ["schedules", "search"],
+              "query": [
+                { "key": "departure_station", "value": "1", "description": "ID Stasiun asal" },
+                { "key": "arrival_station", "value": "2", "description": "ID Stasiun tujuan" },
+                { "key": "date", "value": "2026-07-01", "description": "Tanggal keberangkatan" },
+                { "key": "passengers", "value": "2", "description": "Jumlah penumpang" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Schedule - Halim to Karawang",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/schedules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_id\": 1,\n    \"departure_station\": 1,\n    \"arrival_station\": 2,\n    \"departure_time\": \"2026-07-01T08:00:00.000Z\",\n    \"arrival_time\": \"2026-07-01T09:30:00.000Z\",\n    \"price\": 150000\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Schedule - Padalarang to Tegalluar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/schedules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"train_id\": 1,\n    \"departure_station\": 3,\n    \"arrival_station\": 4,\n    \"departure_time\": \"2026-07-01T10:00:00.000Z\",\n    \"arrival_time\": \"2026-07-01T11:00:00.000Z\",\n    \"price\": 120000\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Update Schedule",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{base_url}}/schedules/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"price\": 175000\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Delete Schedule",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/schedules/2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Bookings",
+      "item": [
+        {
+          "name": "Get Available Seats for Schedule",
+          "description": "Cek kursi yang masih tersedia untuk jadwal tertentu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings/1/available-seats"
+          }
+        },
+        {
+          "name": "Create Booking",
+          "description": "Buat booking baru dengan data penumpang dan kursi. Status = pending, expired 15 menit.",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"schedule_id\": 1,\n    \"passengers\": [\n        {\n            \"full_name\": \"Budi Santoso\",\n            \"id_number\": \"3201234567890001\",\n            \"seat_id\": 1\n        },\n        {\n            \"full_name\": \"Siti Aminah\",\n            \"id_number\": \"3201234567890002\",\n            \"seat_id\": 2\n        }\n    ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "description": "Lihat semua booking milik user yang login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings/my"
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/bookings/1"
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "description": "Batalkan booking (hanya bisa jika status pending/paid)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/bookings/1/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Payments",
+      "item": [
+        {
+          "name": "Create Payment",
+          "description": "Inisiasi pembayaran. Metode: bank_transfer, ewallet, qris, credit_card. Akan return snap_token simulasi.",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"booking_id\": 1,\n    \"payment_method\": \"bank_transfer\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Payment Callback (Simulasi Gateway)",
+          "description": "Simulasi callback dari payment gateway (Midtrans/Xendit). Body: payment_id dan status (success/failed). Akan otomatis generate tiket jika success.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/payments/callback",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"payment_id\": 1,\n    \"status\": \"success\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get Payment by Booking ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/payments/booking/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Tickets",
+      "item": [
+        {
+          "name": "Generate Ticket",
+          "description": "Generate tiket manual (biasanya otomatis setelah payment callback success). Booking harus status = paid.",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/tickets/generate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"booking_id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get Ticket by Booking ID",
+          "description": "Lihat tiket beserta QR code dan detail perjalanan",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/tickets/booking/1"
+          }
+        },
+        {
+          "name": "Scan Ticket (Check-in)",
+          "description": "Simulasi scan QR Code di gate stasiun. Validasi tiket dan ubah status ke used/completed.",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/tickets/scan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"qr_code\": \"WOOSH-WSH-1234567890-ABCDEF-1234567890123-abcdef1234567890\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
