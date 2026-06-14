@@ -43,12 +43,42 @@ export const createTrainService = async (data) => {
             throw new Error("Kode Kereta sudah ada di database.");
         }
 
-        const train = await prisma.train.create({
-            data: {
-                train_name,
-                train_code,
-                total_seats: total_seats ? parseInt(total_seats) : undefined,
-            },
+        const train = await prisma.$transaction(async (tx) => {
+            const newTrain = await tx.train.create({
+                data: {
+                    train_name,
+                    train_code,
+                    total_seats: total_seats ? parseInt(total_seats) : 400,
+                },
+            });
+
+            // Auto-generate seats for this train (8 coaches, 10 rows, 5 seats per row)
+            const coaches = ["01", "02", "03", "04", "05", "06", "07", "08"];
+            const letters = ["A", "B", "C", "D", "F"];
+            const seatsData = [];
+
+            for (const coach of coaches) {
+                let seatClass = "premium_economy";
+                if (coach === "01") seatClass = "first_class";
+                else if (coach === "02") seatClass = "business";
+
+                for (let row = 1; row <= 10; row++) {
+                    for (const letter of letters) {
+                        seatsData.push({
+                            train_id: newTrain.train_id,
+                            coach_number: `Coach ${coach}`,
+                            seat_number: `${row.toString().padStart(2, '0')}${letter}`,
+                            class: seatClass
+                        });
+                    }
+                }
+            }
+
+            await tx.seat.createMany({
+                data: seatsData
+            });
+
+            return newTrain;
         });
 
         return train;

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { verifyToken } from "../middlewares/authLimit.js";
 import {
     getAllScheduleController,
     getScheduleByIdController,
@@ -10,12 +11,14 @@ import {
 
 const router = Router();
 
-// /search MUST be before /:id to prevent "search" from being treated as an ID
+// /search MUST be before /:id
 router.get("/search", searchScheduleController);
 router.get("/", getAllScheduleController);
 router.get("/:id", getScheduleByIdController);
-router.post("/", createScheduleController);
-router.put("/:id", updateScheduleController);
-router.delete("/:id", deleteScheduleController);
+
+// Protected routes (Admin only logic should be here)
+router.post("/", verifyToken, createScheduleController);
+router.put("/:id", verifyToken, updateScheduleController);
+router.delete("/:id", verifyToken, deleteScheduleController);
 
 export default router;

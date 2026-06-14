@@ -39,7 +39,7 @@ app.get("/", (req, res) => {
 // Auto-Cancel Expired Bookings
 // Berjalan setiap 60 detik untuk membatalkan booking yang belum dibayar
 // ============================================================
-const AUTO_CANCEL_INTERVAL = 60 * 1000; // 60 detik
+const AUTO_CANCEL_INTERVAL = 60 * 1000; // Cek setiap 1 menit
 setInterval(async () => {
     await cancelExpiredBookingsService();
 }, AUTO_CANCEL_INTERVAL);

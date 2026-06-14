@@ -6,10 +6,12 @@ import {
     getMyBookingsController,
     cancelBookingController,
     getAvailableSeatsController,
+    getAdminStatsController
 } from "../controller/bookingController.js";
 
 const router = Router();
 
+router.get("/stats", verifyToken, getAdminStatsController);
 // /my must be before /:id
 router.get("/my", verifyToken, getMyBookingsController);
 router.get("/:id", verifyToken, getBookingByIdController);

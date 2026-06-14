@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { verifyToken } from "../middlewares/authLimit.js";
 import {
     createTrainController,
     getAllTrainController,
@@ -11,8 +12,8 @@ const router = Router();
 
 router.get("/", getAllTrainController);
 router.get("/:id", getTrainByIdController);
-router.post("/", createTrainController);
-router.put("/:id", updateTrainController);
-router.delete("/:id", deleteTrainController);
+router.post("/", verifyToken, createTrainController);
+router.put("/:id", verifyToken, updateTrainController);
+router.delete("/:id", verifyToken, deleteTrainController);
 
 export default router;

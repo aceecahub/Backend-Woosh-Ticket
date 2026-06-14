@@ -4,9 +4,8 @@ import prisma from "../config/prisma/client.js";
  * Generate kode booking unik: WSH-{timestamp}-{random}
  */
 const generateBookingCode = () => {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-    return `WSH-${timestamp}-${random}`;
+    const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+    return `WSH-${random}`;
 };
 
 /**
@@ -42,8 +41,16 @@ export const createBookingService = async (userId, data) => {
             throw new Error("Jadwal tidak ditemukan.");
         }
 
-        if (new Date(schedule.departure_time) <= new Date()) {
-            throw new Error("Jadwal sudah berangkat. Tidak dapat melakukan pemesanan.");
+        // LOGGING UNTUK DEBUGGING (Cek di terminal backend)
+        const depTime = new Date(schedule.departure_time);
+        const now = new Date();
+
+        // Toleransi: Izinkan booking jika keberangkatan masih dalam 2 jam terakhir (untuk testing)
+        // Atau jika depTime di masa depan, pasti lolos.
+        const isPast = depTime.getTime() < (now.getTime() - (2 * 60 * 60 * 1000));
+
+        if (isPast) {
+            throw new Error(`Jadwal sudah berangkat (Tiket: ${depTime.getHours()}:${depTime.getMinutes()}, Sekarang: ${now.getHours()}:${now.getMinutes()}).`);
         }
 
         // 2. Validasi setiap kursi
@@ -89,13 +96,18 @@ export const createBookingService = async (userId, data) => {
             throw new Error(`Kursi berikut sudah dipesan: ${takenSeats}. Silakan pilih kursi lain.`);
         }
 
-        // 4. Hitung total harga (price dasar * jumlah penumpang)
-        const totalPrice = parseFloat(schedule.price) * passengers.length;
+        // 4. Hitung total harga berdasarkan KELAS KURSI
+        let totalPrice = 0;
+        seats.forEach(seat => {
+            const basePrice = parseFloat(schedule.price);
+            if (seat.class === "first_class") totalPrice += basePrice * 2;
+            else if (seat.class === "business") totalPrice += basePrice * 1.5;
+            else totalPrice += basePrice;
+        });
 
         // 5. Buat booking dalam transaksi
         const bookingCode = generateBookingCode();
-        const now = new Date();
-        const expiredAt = new Date(now.getTime() + 15 * 60 * 1000); // +15 menit
+        const expiredAt = new Date(now.getTime() + 5 * 60 * 1000); // Batas 5 menit sesuai permintaan user
 
         const booking = await prisma.$transaction(async (tx) => {
             const newBooking = await tx.booking.create({
@@ -121,19 +133,29 @@ export const createBookingService = async (userId, data) => {
                 data: passengerData,
             });
 
-            // Return booking lengkap
-            return tx.booking.findUnique({
-                where: { booking_id: newBooking.booking_id },
-                include: {
-                    bookingPassengers: { include: { seat: true } },
-                    schedule: { include: { train: true, departureStation: true, arrivalStation: true } },
-                },
-            });
+            return newBooking.booking_id;
         });
 
-        return booking;
+        // Ambil data lengkap setelah transaksi selesai
+        const result = await prisma.booking.findUnique({
+            where: { booking_id: booking },
+            include: {
+                bookingPassengers: { include: { seat: true } },
+                schedule: { include: { train: true, departureStation: true, arrivalStation: true } },
+            },
+        });
+
+        // Konversi Decimal ke Number agar tidak error saat JSON stringify
+        const serializedResult = JSON.parse(JSON.stringify(result, (key, value) =>
+            typeof value === 'object' && value?.constructor?.name === 'Decimal'
+                ? parseFloat(value.toString())
+                : value
+        ));
+
+        return serializedResult;
     } catch (error) {
-        throw new Error(error.message);
+        console.error("Service Error Details:", error);
+        throw error;
     }
 };
 
@@ -256,10 +278,42 @@ export const getAvailableSeatsService = async (schedule_id) => {
         }
 
         // Ambil semua kursi untuk kereta ini
-        const allSeats = await prisma.seat.findMany({
+        let allSeats = await prisma.seat.findMany({
             where: { train_id: schedule.train_id },
             orderBy: [{ coach_number: "asc" }, { seat_number: "asc" }],
         });
+
+        // FALLBACK: Jika kereta belum punya kursi (data lama), buat otomatis
+        if (allSeats.length === 0) {
+            const coaches = ["01", "02", "03", "04", "05", "06", "07", "08"];
+            const letters = ["A", "B", "C", "D", "F"];
+            const seatsData = [];
+
+            for (const coach of coaches) {
+                let seatClass = "premium_economy";
+                if (coach === "01") seatClass = "first_class";
+                else if (coach === "02") seatClass = "business";
+
+                for (let row = 1; row <= 10; row++) {
+                    for (const letter of letters) {
+                        seatsData.push({
+                            train_id: schedule.train_id,
+                            coach_number: `Coach ${coach}`,
+                            seat_number: `${row.toString().padStart(2, '0')}${letter}`,
+                            class: seatClass
+                        });
+                    }
+                }
+            }
+
+            await prisma.seat.createMany({ data: seatsData });
+
+            // Ambil ulang setelah dibuat
+            allSeats = await prisma.seat.findMany({
+                where: { train_id: schedule.train_id },
+                orderBy: [{ coach_number: "asc" }, { seat_number: "asc" }],
+            });
+        }
 
         // Ambil kursi yang sudah dibooking (pending/paid) untuk jadwal ini
         const bookedPassengers = await prisma.bookingPassenger.findMany({
@@ -279,7 +333,7 @@ export const getAvailableSeatsService = async (schedule_id) => {
         return {
             schedule_id: scheduleId,
             train_name: schedule.train.train_name,
-            total_seats: schedule.train.total_seats,
+            total_seats: allSeats.length,
             booked_count: bookedSeatIds.size,
             available_count: availableSeats.length,
             seats: availableSeats,

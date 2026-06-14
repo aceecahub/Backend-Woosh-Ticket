@@ -163,10 +163,14 @@ export const searchScheduleService = async (query) => {
     }
 
     if (date) {
-        const startDate = new Date(date);
-        const endDate = new Date(date);
-        endDate.setDate(endDate.getDate() + 1);
-        where.departure_time = { gte: startDate, lt: endDate };
+        // Gunakan rentang waktu lokal hari tersebut (00:00:00 sampai 23:59:59)
+        const startDate = new Date(`${date}T00:00:00`);
+        const endDate = new Date(`${date}T23:59:59`);
+
+        where.departure_time = {
+            gte: startDate,
+            lte: endDate
+        };
     }
 
     // Stasiun asal dan tujuan tidak boleh sama

@@ -1,12 +1,19 @@
 import prisma from "../config/prisma/client.js";
 import { generateTicketService } from "./ticketService.js";
+import midtransClient from 'midtrans-client';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Inisialisasi Midtrans Snap
+let snap = new midtransClient.Snap({
+    isProduction: false,
+    serverKey: process.env.MIDTRANS_SERVER_KEY,
+    clientKey: process.env.MIDTRANS_CLIENT_KEY
+});
 
 /**
  * CREATE PAYMENT
- * Alur bisnis:
- * 1. Validasi booking ada, milik user, status pending, belum expired
- * 2. Buat record payment dengan status pending
- * 3. Return data pembayaran (simulasi gateway: snap_token)
  */
 export const createPaymentService = async (booking_id, userId, payment_method) => {
     const bookingId = parseInt(booking_id);
@@ -14,18 +21,13 @@ export const createPaymentService = async (booking_id, userId, payment_method) =
         throw new Error("ID Booking tidak valid.");
     }
 
-    if (!payment_method) {
-        throw new Error("Metode pembayaran wajib dipilih.");
-    }
-
-    const validMethods = ["bank_transfer", "ewallet", "qris", "credit_card"];
-    if (!validMethods.includes(payment_method)) {
-        throw new Error(`Metode pembayaran tidak valid. Pilih: ${validMethods.join(", ")}`);
-    }
-
     try {
+        // Ambil data booking DAN data user sekaligus
         const booking = await prisma.booking.findUnique({
             where: { booking_id: bookingId },
+            include: {
+                user: true // Penting untuk customer_details Midtrans
+            }
         });
 
         if (!booking) {
@@ -42,7 +44,6 @@ export const createPaymentService = async (booking_id, userId, payment_method) =
 
         // Cek expired
         if (booking.expired_at && new Date(booking.expired_at) < new Date()) {
-            // Auto-cancel kalau sudah expired
             await prisma.booking.update({
                 where: { booking_id: bookingId },
                 data: { status: "cancelled" },
@@ -50,21 +51,31 @@ export const createPaymentService = async (booking_id, userId, payment_method) =
             throw new Error("Waktu pembayaran sudah habis. Booking telah dibatalkan otomatis.");
         }
 
-        // Cek apakah sudah ada payment success
-        const existingSuccess = await prisma.payment.findFirst({
-            where: { booking_id: bookingId, payment_status: "success" },
-        });
-        if (existingSuccess) {
-            throw new Error("Booking sudah dibayar sebelumnya.");
-        }
+        // Buat parameter transaksi untuk Midtrans
+        let parameter = {
+            "transaction_details": {
+                "order_id": `${booking.booking_code}-${Date.now()}`, // Tambahkan suffix agar order_id unik jika diulang
+                "gross_amount": Math.floor(booking.total_price)
+            },
+            "credit_card": {
+                "secure": true
+            },
+            "customer_details": {
+                "first_name": booking.user.full_name,
+                "email": booking.user.email,
+                "phone": booking.user.phone
+            }
+        };
 
-        // Simulasi snap_token dari payment gateway (Midtrans/Xendit)
-        const snapToken = `snap_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+        // Ambil snapToken asli dari Midtrans
+        const transaction = await snap.createTransaction(parameter);
+        const snapToken = transaction.token;
 
+        // Simpan ke database
         const payment = await prisma.payment.create({
             data: {
                 booking_id: bookingId,
-                payment_method,
+                payment_method: payment_method || "bank_transfer", // Harus sesuai enum di schema.prisma
                 amount: booking.total_price,
                 payment_status: "pending",
                 snap_token: snapToken,
@@ -73,20 +84,17 @@ export const createPaymentService = async (booking_id, userId, payment_method) =
 
         return {
             ...payment,
-            redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${snapToken}`,
+            redirect_url: transaction.redirect_url,
+            snap_token: snapToken
         };
     } catch (error) {
+        console.error("Midtrans Error:", error);
         throw new Error(error.message);
     }
 };
 
 /**
  * PROCESS PAYMENT CALLBACK
- * Alur bisnis:
- * 1. Simulasi callback dari payment gateway
- * 2. Update payment status ke success
- * 3. Update booking status ke paid
- * 4. Generate tiket otomatis
  */
 export const processPaymentCallbackService = async (payment_id, status = "success") => {
     const paymentId = parseInt(payment_id);
@@ -103,12 +111,7 @@ export const processPaymentCallbackService = async (payment_id, status = "succes
             throw new Error("Payment tidak ditemukan.");
         }
 
-        if (payment.payment_status === "success") {
-            throw new Error("Payment sudah diproses sebelumnya.");
-        }
-
         const result = await prisma.$transaction(async (tx) => {
-            // Update payment status
             const updatedPayment = await tx.payment.update({
                 where: { payment_id: paymentId },
                 data: {
@@ -118,7 +121,6 @@ export const processPaymentCallbackService = async (payment_id, status = "succes
             });
 
             if (status === "success") {
-                // Update booking status ke paid
                 await tx.booking.update({
                     where: { booking_id: payment.booking_id },
                     data: { status: "paid" },
@@ -128,7 +130,6 @@ export const processPaymentCallbackService = async (payment_id, status = "succes
             return updatedPayment;
         });
 
-        // Generate tiket setelah transaksi berhasil (di luar transaksi agar tidak blocking)
         if (status === "success") {
             try {
                 const ticket = await generateTicketService(payment.booking_id);

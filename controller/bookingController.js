@@ -1,3 +1,4 @@
+import prisma from "../config/prisma/client.js";
 import {
     createBookingService,
     getBookingByIdService,
@@ -11,7 +12,13 @@ export const createBookingController = async (req, res) => {
         const booking = await createBookingService(req.user.id, req.body);
         return res.status(201).json({ message: "Booking berhasil dibuat", data: booking });
     } catch (error) {
-        return res.status(500).json({ message: error.message });
+        console.error("Create Booking Error:", error);
+        // Kirim error detail ke frontend agar kita tahu apa yang salah
+        return res.status(500).json({
+            message: error.message || "Internal Server Error",
+            stack: error.stack,
+            error: error
+        });
     }
 };
 
@@ -19,6 +26,30 @@ export const getBookingByIdController = async (req, res) => {
     try {
         const booking = await getBookingByIdService(req.params.id);
         return res.status(200).json({ message: "Data booking berhasil ditampilkan", data: booking });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+export const getAdminStatsController = async (req, res) => {
+    try {
+        const totalUsers = await prisma.user.count({ where: { role: 'customer' } });
+        const totalBookings = await prisma.booking.count();
+        const totalSchedules = await prisma.schedule.count();
+
+        const revenue = await prisma.booking.aggregate({
+            where: { status: 'paid' },
+            _sum: { total_price: true }
+        });
+
+        const data = {
+            totalUsers,
+            totalBookings,
+            totalSchedules,
+            totalRevenue: revenue._sum.total_price || 0
+        };
+
+        return res.status(200).json({ message: "Stats fetched", data });
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
